@@ -2,130 +2,612 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="YouthManager">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
   <title>Reports – Church Youth Manager</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── Report-specific styles ── */
+
+    /* Tab switcher */
+    .rep-tabs {
+      display: flex;
+      background: var(--ivory);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      gap: 3px;
+      border: 1px solid var(--border);
+      width: fit-content;
+    }
+    .rep-tab {
+      padding: .5rem 1.2rem;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .18s;
+      white-space: nowrap;
+    }
+    .rep-tab.active {
+      background: var(--navy);
+      color: var(--white);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── Yearly grid table ── */
+    .yearly-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .yearly-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: .78rem;
+      width: 100%;
+    }
+    .yearly-table th,
+    .yearly-table td {
+      padding: 0;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* Sticky first column (member name) */
+    .yearly-table th:first-child,
+    .yearly-table td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: var(--white);
+      text-align: left;
+      min-width: 130px;
+      max-width: 150px;
+      border-right: 2px solid var(--border2);
+    }
+    .yearly-table thead th:first-child {
+      z-index: 3;
+      background: #1a2744;
+    }
+
+    /* Sticky last column (Total) */
+    .yearly-table th:last-child,
+    .yearly-table td:last-child {
+      position: sticky;
+      right: 0;
+      z-index: 2;
+      background: var(--ivory);
+      border-left: 2px solid var(--border2);
+      font-weight: 700;
+      min-width: 72px;
+    }
+    .yearly-table thead th:last-child {
+      background: #1a2744;
+      z-index: 3;
+    }
+
+    /* Header row */
+    .yearly-table thead th {
+      background: var(--navy);
+      color: rgba(255,255,255,.90);
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: .6rem .5rem;
+      white-space: nowrap;
+      border-bottom: none;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    /* Member name cell */
+    .member-cell {
+      padding: .5rem .75rem;
+      line-height: 1.25;
+    }
+    .member-cell .mname {
+      font-weight: 700;
+      font-size: .8rem;
+      color: var(--navy);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+    .member-cell .mid {
+      font-size: .65rem;
+      color: var(--muted);
+    }
+
+    /* Amount cells */
+    .amt-cell {
+      padding: .45rem .3rem;
+      min-width: 54px;
+      font-weight: 600;
+      font-size: .76rem;
+    }
+    .amt-cell.paid-full   { background: rgba(46,204,113,.15); color: #1a7a4a; }
+    .amt-cell.paid-partial{ background: rgba(243,156,18,.14); color: #7a4a00; }
+    .amt-cell.unpaid      { color: var(--muted); }
+    .amt-cell.overpaid    { background: rgba(52,152,219,.13); color: #1a5a90; }
+
+    .amt-cell .dash { color: #cdd4de; font-size: .85rem; }
+
+    /* Total cell */
+    .total-cell {
+      padding: .45rem .5rem;
+      font-weight: 800;
+      font-size: .8rem;
+      color: var(--navy);
+    }
+    .total-cell.zero { color: var(--muted); font-weight: 500; }
+
+    /* Footer totals row */
+    .yearly-table tfoot tr {
+      background: var(--navy) !important;
+    }
+    .yearly-table tfoot td {
+      padding: .55rem .3rem;
+      font-weight: 700;
+      font-size: .76rem;
+      color: rgba(255,255,255,.90);
+      border-bottom: none;
+      background: var(--navy);
+    }
+    .yearly-table tfoot td:first-child {
+      background: var(--navy);
+      color: var(--gold);
+      font-size: .78rem;
+      letter-spacing: .3px;
+    }
+    .yearly-table tfoot td:last-child {
+      background: var(--navy);
+      color: var(--gold);
+    }
+
+    /* Row hover */
+    .yearly-table tbody tr:hover td { background: rgba(240,165,0,.04) !important; }
+    .yearly-table tbody tr:hover td:first-child,
+    .yearly-table tbody tr:hover td:last-child { background: rgba(240,165,0,.07) !important; }
+
+    /* ── Monthly table ── */
+    .monthly-badge-row { display: flex; align-items: center; gap: .4rem; }
+
+    /* ── Summary header cards ── */
+    .rep-header-card {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.5rem;
+      color: var(--white);
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .75rem;
+    }
+    .rep-header-card .rh-title { font-size: .75rem; font-weight: 600; opacity: .55; text-transform: uppercase; letter-spacing: .6px; }
+    .rep-header-card .rh-val   { font-size: 1.4rem; font-weight: 800; line-height: 1.1; }
+    .rep-header-card .rh-sub   { font-size: .75rem; opacity: .60; margin-top: .15rem; }
+
+    /* Legend */
+    .legend {
+      display: flex; gap: .9rem; flex-wrap: wrap;
+      margin-bottom: .9rem; align-items: center;
+      font-size: .75rem; font-weight: 600; color: var(--slate);
+    }
+    .legend-item { display: flex; align-items: center; gap: .35rem; }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 3px;
+    }
+
+    /* Print */
+    @media print {
+      .rep-tabs, .no-print { display: none !important; }
+      .yearly-wrap { overflow: visible; }
+      .yearly-table th:first-child,
+      .yearly-table td:first-child,
+      .yearly-table th:last-child,
+      .yearly-table td:last-child { position: static; }
+      .rep-header-card { background: var(--navy) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .amt-cell.paid-full    { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .amt-cell.paid-partial { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    @media (max-width: 600px) {
+      .rep-tabs { width: 100%; justify-content: stretch; }
+      .rep-tab  { flex: 1; padding: .5rem .5rem; font-size: .76rem; }
+      .amt-cell { min-width: 46px; font-size: .7rem; }
+      .member-cell .mname { max-width: 90px; font-size: .74rem; }
+    }
+  </style>
 </head>
 <body>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="firebase/firebase-config.js"></script>
-<script src="js/1sync.js"></script>
-<script src="js/1app.js"></script>
-<script src="js/1layout.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/app.js"></script>
+<script src="js/layout.js"></script>
 <script>
 App.requireAuth(({ churchId, role, settings }) => {
   renderLayout('Reports');
 
-  const cid  = churchId;
+  const cid = churchId;
   const body = document.getElementById('page-body');
-  const yr   = App.currentYear();
+  const CUR_YEAR = App.currentYear();
 
   body.innerHTML = `
-    <!-- Controls -->
-    <div class="toolbar no-print" style="margin-bottom:1.2rem">
-      <select id="rep-type" class="form-control" style="width:auto" onchange="buildReport()">
-        <option value="monthly">Monthly Report</option>
-        <option value="yearly">Yearly Report</option>
-        <option value="member">Member-wise Report</option>
+    <!-- ── Controls bar ── -->
+    <div class="no-print" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1.2rem">
+      <div class="rep-tabs" id="rep-tabs">
+        <button class="rep-tab active" data-tab="yearly"   onclick="switchTab('yearly')">📅 Yearly Overview</button>
+        <button class="rep-tab"        data-tab="monthly"  onclick="switchTab('monthly')">📆 Monthly Report</button>
+        <button class="rep-tab"        data-tab="member"   onclick="switchTab('member')">👤 Member-wise</button>
+      </div>
+      <select id="rep-year" class="form-control" style="width:90px" onchange="buildReport()">
+        ${[CUR_YEAR, CUR_YEAR-1, CUR_YEAR-2].map(y=>`<option value="${y}">${y}</option>`).join('')}
       </select>
-      <select id="rep-month" class="form-control" style="width:auto" onchange="buildReport()">
-        ${App.MONTHS.map(m => `<option value="${m}" ${m===App.currentMonthName()?'selected':''}>${m}</option>`).join('')}
+      <select id="rep-month" class="form-control" style="width:120px;display:none" onchange="buildReport()">
+        ${App.MONTHS.map(m=>`<option value="${m}" ${m===App.currentMonthName()?'selected':''}>${m}</option>`).join('')}
       </select>
-      <select id="rep-year" class="form-control" style="width:auto" onchange="buildReport()">
-        ${[yr, yr-1, yr-2].map(y => `<option value="${y}">${y}</option>`).join('')}
-      </select>
-      <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Print</button>
-      <button class="btn btn-gold btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Print</button>
+        <button class="btn btn-gold btn-sm"    onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
     </div>
 
     <div id="report-area"></div>
   `;
 
   let members = {}, collections = {};
+  let currentTab = 'yearly';
 
   async function loadData() {
-    members     = (await SyncEngine.read(`churches/${cid}/members`, `members_${cid}`)) || {};
+    members     = (await SyncEngine.read(`churches/${cid}/members`,     `members_${cid}`))     || {};
     collections = (await SyncEngine.read(`churches/${cid}/collections`, `collections_${cid}`)) || {};
+
+    // Also live-listen so it updates when data changes
+    db.ref(`churches/${cid}/members`).on('value', s => {
+      members = s.val() || {};
+      SyncEngine.cacheWrite('members_' + cid, members);
+      buildReport();
+    });
+    db.ref(`churches/${cid}/collections`).on('value', s => {
+      collections = s.val() || {};
+      SyncEngine.cacheWrite('collections_' + cid, collections);
+      buildReport();
+    });
+
     buildReport();
   }
 
-  window.buildReport = function() {
-    const type  = document.getElementById('rep-type').value;
-    const month = document.getElementById('rep-month').value;
-    const year  = document.getElementById('rep-year').value;
-    const repMonth = document.getElementById('rep-month');
-    repMonth.style.display = type === 'yearly' ? 'none' : 'block';
+  window.switchTab = function(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.rep-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('rep-month').style.display = tab === 'monthly' ? 'block' : 'none';
+    buildReport();
+  };
 
-    if (type === 'monthly') buildMonthlyReport(month, year);
-    else if (type === 'yearly') buildYearlyReport(year);
+  window.buildReport = function() {
+    const year  = document.getElementById('rep-year').value;
+    const month = document.getElementById('rep-month').value;
+    if (currentTab === 'yearly')  buildYearlyOverview(year);
+    else if (currentTab === 'monthly') buildMonthlyReport(month, year);
     else buildMemberReport(year);
   };
 
+  /* ════════════════════════════════════════════════════════
+     YEARLY OVERVIEW  — Member × Month grid  (like screenshot)
+     ════════════════════════════════════════════════════════ */
+  function buildYearlyOverview(year) {
+    const activeMembers = Object.entries(members)
+      .filter(([, m]) => m.status === 'active')
+      .sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+
+    const MONTHS_SHORT = App.MONTHS.map(m => m.slice(0, 3));
+
+    // Build lookup: memberId → month → total paid
+    const paidMap = {};
+    Object.values(collections).forEach(c => {
+      if (String(c.year || CUR_YEAR) !== String(year)) return;
+      if (!paidMap[c.memberId]) paidMap[c.memberId] = {};
+      const mn = c.month;
+      paidMap[c.memberId][mn] = (paidMap[c.memberId][mn] || 0) + Number(c.amount || 0);
+    });
+
+    // Grand totals per month
+    const monthTotals = App.MONTHS.map(mn =>
+      activeMembers.reduce((s, [id]) => s + (paidMap[id]?.[mn] || 0), 0)
+    );
+    const grandTotal = monthTotals.reduce((a, b) => a + b, 0);
+
+    // Summary stats
+    let totalTarget = 0, totalCollected = 0, totalPending = 0, completedCount = 0, zeroCount = 0;
+    activeMembers.forEach(([id, m]) => {
+      const yearTarget = Number(m.monthlyContribution || 0) * 12;
+      const yearPaid   = App.MONTHS.reduce((s, mn) => s + (paidMap[id]?.[mn] || 0), 0);
+      totalTarget    += yearTarget;
+      totalCollected += yearPaid;
+      if (yearPaid <= 0) zeroCount++;
+      if (yearPaid >= yearTarget && yearTarget > 0) completedCount++;
+    });
+    totalPending = Math.max(0, totalTarget - totalCollected);
+    const pct = totalTarget ? Math.round((totalCollected / totalTarget) * 100) : 0;
+    const church = settings.churchName || 'Church';
+
+    document.getElementById('report-area').innerHTML = `
+
+      <!-- Header summary -->
+      <div class="rep-header-card no-print">
+        <div>
+          <div class="rh-title">${church}</div>
+          <div class="rh-val">Yearly Overview ${year}</div>
+          <div class="rh-sub">${activeMembers.length} active members</div>
+        </div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+          ${summaryPill('🎯 Target',    App.currency(totalTarget),    'rgba(255,255,255,.12)')}
+          ${summaryPill('✅ Collected', App.currency(totalCollected), 'rgba(46,204,113,.25)')}
+          ${summaryPill('⏳ Pending',   App.currency(totalPending),   'rgba(231,76,60,.22)')}
+          ${summaryPill('📈 Achievement', pct + '%',                  'rgba(240,165,0,.25)')}
+        </div>
+      </div>
+
+      <!-- Stat mini-cards -->
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:1rem">
+        ${tile('👥','Members',    activeMembers.length,              'navy')}
+        ${tile('✅','Fully Paid', completedCount + ' members',       'green')}
+        ${tile('⏳','Not Paid',   zeroCount + ' members',            'red')}
+        ${tile('📈','Achievement', pct + '%',                        pct>=80?'green':pct>=50?'gold':'red')}
+        ${tile('💰','Total Collected', App.currency(totalCollected), 'gold')}
+        ${tile('🔴','Total Pending',   App.currency(totalPending),   'orange')}
+      </div>
+
+      <!-- Legend -->
+      <div class="legend no-print">
+        <span style="font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Legend:</span>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(46,204,113,.5)"></div> Full Payment</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(243,156,18,.5)"></div> Partial Payment</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e8ebf0"></div> No Payment</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(52,152,219,.4)"></div> Overpaid</div>
+      </div>
+
+      <!-- Grid table -->
+      <div class="card">
+        <div class="card-header" style="gap:.5rem;flex-wrap:wrap">
+          <h3>Member × Month Collection Grid — ${year}</h3>
+          <span style="font-size:.75rem;color:var(--muted)">${activeMembers.length} members · scroll horizontally →</span>
+        </div>
+        <div class="yearly-wrap">
+          <table class="yearly-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:.6rem .75rem">Member</th>
+                ${MONTHS_SHORT.map(m => `<th>${m}</th>`).join('')}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${activeMembers.map(([id, m]) => {
+                const target = Number(m.monthlyContribution || 0);
+                const memberPaid = paidMap[id] || {};
+                const rowTotal = App.MONTHS.reduce((s, mn) => s + (memberPaid[mn] || 0), 0);
+                const yearTarget = target * 12;
+
+                return `<tr>
+                  <td>
+                    <div class="member-cell">
+                      <div class="mname" title="${m.name}">${m.name}</div>
+                      <div class="mid">${id}</div>
+                    </div>
+                  </td>
+                  ${App.MONTHS.map(mn => {
+                    const paid = memberPaid[mn] || 0;
+                    if (paid === 0) {
+                      return `<td class="amt-cell unpaid"><span class="dash">–</span></td>`;
+                    }
+                    const cls = paid > target  ? 'overpaid'
+                              : paid >= target ? 'paid-full'
+                              : 'paid-partial';
+                    return `<td class="amt-cell ${cls}">${App.getCurrency()}${paid}</td>`;
+                  }).join('')}
+                  <td class="total-cell ${rowTotal===0?'zero':''}">
+                    ${rowTotal === 0 ? `<span class="dash">–</span>` : App.getCurrency() + rowTotal}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td style="padding:.55rem .75rem;text-align:left;font-weight:800;font-size:.78rem">
+                  TOTAL
+                </td>
+                ${monthTotals.map(t => `
+                  <td style="padding:.55rem .3rem;font-weight:700;font-size:.76rem">
+                    ${t > 0 ? App.getCurrency() + t : '–'}
+                  </td>`).join('')}
+                <td style="padding:.55rem .5rem;font-size:.82rem;font-weight:800;color:var(--gold)">
+                  ${App.getCurrency()}${grandTotal}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Per-month breakdown below grid -->
+      <div style="margin-top:1.2rem">
+        <div class="card">
+          <div class="card-header"><h3>Monthly Summary — ${year}</h3></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th><th>Target</th><th>Collected</th>
+                  <th>Pending</th><th>Members Paid</th><th>Achievement</th><th class="no-print">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${App.MONTHS.map((mn, i) => {
+                  const c  = monthTotals[i];
+                  const t  = activeMembers.reduce((s,[,m])=>s+Number(m.monthlyContribution||0),0);
+                  const p  = Math.max(0, t - c);
+                  const pct2 = t ? Math.round((c / t) * 100) : 0;
+                  const paidCount = activeMembers.filter(([id, m]) => {
+                    const paid = paidMap[id]?.[mn] || 0;
+                    return paid >= Number(m.monthlyContribution || 0) && paid > 0;
+                  }).length;
+                  return `<tr>
+                    <td style="font-weight:700">${mn}</td>
+                    <td>${App.currency(t)}</td>
+                    <td style="color:var(--green);font-weight:700">${c>0 ? App.currency(c) : '–'}</td>
+                    <td style="color:var(--red)">${p>0 ? App.currency(p) : '–'}</td>
+                    <td><span class="badge ${paidCount===activeMembers.length?'badge-success':paidCount>0?'badge-warning':'badge-neutral'}">${paidCount} / ${activeMembers.length}</span></td>
+                    <td><span class="badge ${pct2>=80?'badge-success':pct2>=50?'badge-warning':pct2>0?'badge-danger':'badge-neutral'}">${pct2}%</span></td>
+                    <td class="no-print" style="min-width:100px">
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width:${pct2}%;background:${pct2>=80?'var(--green)':pct2>=50?'var(--gold)':'var(--red)'}"></div>
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('')}
+                <tr style="background:var(--ivory);font-weight:800;font-size:.88rem">
+                  <td>TOTAL</td>
+                  <td>${App.currency(totalTarget)}</td>
+                  <td style="color:var(--green)">${App.currency(totalCollected)}</td>
+                  <td style="color:var(--red)">${App.currency(totalPending)}</td>
+                  <td>${completedCount} fully paid</td>
+                  <td><span class="badge ${pct>=80?'badge-success':pct>=50?'badge-warning':'badge-danger'}">${pct}%</span></td>
+                  <td class="no-print"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ════════════════════════════════════════════════════════
+     MONTHLY REPORT  — single month detail
+     ════════════════════════════════════════════════════════ */
   function buildMonthlyReport(month, year) {
-    const colls = Object.values(collections).filter(c => c.month === month && String(c.year || yr) === String(year));
+    const activeMembers = Object.entries(members)
+      .filter(([,m]) => m.status === 'active')
+      .sort((a,b) => (a[1].name||'').localeCompare(b[1].name||''));
+
     const paidBy = {};
-    colls.forEach(c => { paidBy[c.memberId] = (paidBy[c.memberId] || 0) + Number(c.amount || 0); });
+    Object.values(collections).forEach(c => {
+      if (c.month === month && String(c.year || CUR_YEAR) === String(year)) {
+        paidBy[c.memberId] = (paidBy[c.memberId] || 0) + Number(c.amount || 0);
+      }
+    });
 
-    let target = 0, collected = 0, done = 0, pendCount = 0;
-    const rows = Object.entries(members).filter(([,m]) => m.status === 'active').sort((a,b) => a[1].name.localeCompare(b[1].name));
-
-    rows.forEach(([id, m]) => {
+    let target = 0, collected = 0, done = 0, partial = 0, zero = 0;
+    activeMembers.forEach(([id, m]) => {
       const t = Number(m.monthlyContribution || 0);
       const p = paidBy[id] || 0;
       target    += t;
       collected += p;
-      if (p >= t) done++;
-      else pendCount++;
+      if (p >= t && t > 0) done++;
+      else if (p > 0) partial++;
+      else zero++;
     });
-
     const pending = Math.max(0, target - collected);
-    const pct = target ? Math.round((collected/target)*100) : 0;
-    const church = settings.churchName || 'Church';
+    const pct = target ? Math.round((collected / target) * 100) : 0;
 
     document.getElementById('report-area').innerHTML = `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-body" style="text-align:center;padding:1.5rem">
-          <div style="font-size:1.4rem;font-weight:800">${church}</div>
-          <div style="font-size:1rem;color:var(--muted)">Monthly Collection Report – ${month} ${year}</div>
+      <div class="rep-header-card no-print">
+        <div>
+          <div class="rh-title">${settings.churchName || 'Church'}</div>
+          <div class="rh-val">${month} ${year} Collection Report</div>
+          <div class="rh-sub">${activeMembers.length} active members</div>
+        </div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+          ${summaryPill('🎯 Target',    App.currency(target),    'rgba(255,255,255,.12)')}
+          ${summaryPill('✅ Collected', App.currency(collected), 'rgba(46,204,113,.25)')}
+          ${summaryPill('⏳ Pending',   App.currency(pending),   'rgba(231,76,60,.22)')}
+          ${summaryPill('📈 Achievement', pct + '%',             'rgba(240,165,0,.25)')}
         </div>
       </div>
 
-      <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:1rem">
-        ${tile('👥', 'Members', rows.length, '')}
-        ${tile('🎯', 'Target', App.currency(target), '')}
-        ${tile('✅', 'Collected', App.currency(collected), 'green')}
-        ${tile('⏳', 'Pending', App.currency(pending), 'red')}
-        ${tile('📈', 'Achievement', pct + '%', pct>=80?'green':pct>=50?'gold':'red')}
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(155px,1fr));margin-bottom:1rem">
+        ${tile('✅','Completed', done + ' members',    'green')}
+        ${tile('⚡','Partial',   partial + ' members', 'gold')}
+        ${tile('⏳','Not Paid',  zero + ' members',    'red')}
+        ${tile('📈','Achievement', pct + '%',           pct>=80?'green':pct>=50?'gold':'red')}
       </div>
 
       <div class="card">
-        <div class="card-header"><h3>Member Collection Status – ${month} ${year}</h3></div>
+        <div class="card-header">
+          <h3>Member Status — ${month} ${year}</h3>
+          <div style="display:flex;gap:.5rem">
+            <span class="badge badge-success">✅ ${done} completed</span>
+            <span class="badge badge-warning">⚡ ${partial} partial</span>
+            <span class="badge badge-danger">⏳ ${zero} pending</span>
+          </div>
+        </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>#</th><th>Name</th><th>Area</th><th>Target</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Member</th>
+                <th>Area</th>
+                <th>Target</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
             <tbody>
-              ${rows.map(([id, m], i) => {
-                const t = Number(m.monthlyContribution || 0);
-                const p = paidBy[id] || 0;
-                const b = Math.max(0, t - p);
-                const st = p >= t ? 'Completed' : p > 0 ? 'Partial' : 'Pending';
-                const cls = p >= t ? 'badge-success' : p > 0 ? 'badge-warning' : 'badge-danger';
+              ${activeMembers.map(([id, m], i) => {
+                const t   = Number(m.monthlyContribution || 0);
+                const p   = paidBy[id] || 0;
+                const bal = Math.max(0, t - p);
+                const ovr = p > t ? p - t : 0;
+                const st  = p >= t && t > 0 ? 'Completed'
+                          : p > 0           ? 'Partial'
+                          :                   'Pending';
+                const cls = p >= t && t > 0 ? 'badge-success'
+                          : p > 0           ? 'badge-warning'
+                          :                   'badge-danger';
                 return `<tr>
-                  <td>${i+1}</td><td style="font-weight:600">${m.name}</td><td>${m.area||'–'}</td>
-                  <td>${App.currency(t)}</td>
-                  <td style="color:var(--green);font-weight:600">${App.currency(p)}</td>
-                  <td style="color:var(--red)">${App.currency(b)}</td>
+                  <td style="color:var(--muted);font-size:.75rem">${i+1}</td>
+                  <td>
+                    <a href="member-profile.html?id=${id}" style="font-weight:700;color:var(--navy);">${m.name}</a>
+                    <div style="font-size:.68rem;color:var(--muted)">${id}</div>
+                  </td>
+                  <td style="font-size:.8rem">${m.area || '–'}</td>
+                  <td style="font-weight:600">${App.currency(t)}</td>
+                  <td style="color:var(--green);font-weight:700">${p > 0 ? App.currency(p) : '–'}</td>
+                  <td style="color:${bal>0?'var(--red)':ovr>0?'var(--blue)':'var(--green)'};font-weight:600">
+                    ${bal > 0 ? App.currency(bal) : ovr > 0 ? '+' + App.currency(ovr) : '✓'}
+                  </td>
                   <td><span class="badge ${cls}">${st}</span></td>
                 </tr>`;
               }).join('')}
-              <tr style="background:var(--ivory);font-weight:700">
-                <td></td><td>TOTAL</td><td></td>
+              <tr style="background:var(--ivory);font-weight:800;border-top:2px solid var(--border)">
+                <td></td>
+                <td style="font-size:.85rem">TOTAL</td>
+                <td></td>
                 <td>${App.currency(target)}</td>
                 <td style="color:var(--green)">${App.currency(collected)}</td>
-                <td style="color:var(--red)">${App.currency(pending)}</td>
-                <td>${pct}%</td>
+                <td style="color:var(--red)">${pending > 0 ? App.currency(pending) : '–'}</td>
+                <td><span class="badge ${pct>=80?'badge-success':pct>=50?'badge-warning':'badge-danger'}">${pct}%</span></td>
               </tr>
             </tbody>
           </table>
@@ -134,87 +616,110 @@ App.requireAuth(({ churchId, role, settings }) => {
     `;
   }
 
-  function buildYearlyReport(year) {
-    let grandTarget = 0, grandCollected = 0;
-    const rows = App.MONTHS.map(month => {
-      const colls = Object.values(collections).filter(c => c.month === month && String(c.year || yr) === String(year));
-      const collected = colls.reduce((s, c) => s + Number(c.amount || 0), 0);
-      const target = Object.values(members).filter(m => m.status === 'active').reduce((s, m) => s + Number(m.monthlyContribution || 0), 0);
-      grandTarget    += target;
-      grandCollected += collected;
-      const pct = target ? Math.round((collected/target)*100) : 0;
-      return { month, target, collected, pending: Math.max(0, target-collected), pct };
-    });
-
-    document.getElementById('report-area').innerHTML = `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-body" style="text-align:center;padding:1.5rem">
-          <div style="font-size:1.4rem;font-weight:800">${settings.churchName || 'Church'}</div>
-          <div style="font-size:1rem;color:var(--muted)">Yearly Collection Report – ${year}</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3>Year ${year} – Month-wise Summary</h3></div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Month</th><th>Target</th><th>Collected</th><th>Pending</th><th>Achievement</th><th>Progress</th></tr></thead>
-            <tbody>
-              ${rows.map(r => `<tr>
-                <td style="font-weight:600">${r.month}</td>
-                <td>${App.currency(r.target)}</td>
-                <td style="color:var(--green);font-weight:600">${App.currency(r.collected)}</td>
-                <td style="color:var(--red)">${App.currency(r.pending)}</td>
-                <td><span class="badge ${r.pct>=80?'badge-success':r.pct>=50?'badge-warning':'badge-neutral'}">${r.pct}%</span></td>
-                <td style="min-width:100px">
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width:${r.pct}%;background:${r.pct>=80?'var(--green)':r.pct>=50?'var(--gold)':'var(--red)'}"></div>
-                  </div>
-                </td>
-              </tr>`).join('')}
-              <tr style="background:var(--ivory);font-weight:700">
-                <td>TOTAL</td>
-                <td>${App.currency(grandTarget)}</td>
-                <td style="color:var(--green)">${App.currency(grandCollected)}</td>
-                <td style="color:var(--red)">${App.currency(Math.max(0, grandTarget-grandCollected))}</td>
-                <td>${grandTarget?Math.round((grandCollected/grandTarget)*100):0}%</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
-
+  /* ════════════════════════════════════════════════════════
+     MEMBER-WISE YEARLY REPORT
+     ════════════════════════════════════════════════════════ */
   function buildMemberReport(year) {
-    const rows = Object.entries(members).filter(([,m]) => m.status === 'active').sort((a,b) => a[1].name.localeCompare(b[1].name));
-    const memberRows = rows.map(([id, m]) => {
-      const yearColls = Object.values(collections).filter(c => c.memberId === id && String(c.year || yr) === String(year));
-      const paid   = yearColls.reduce((s, c) => s + Number(c.amount || 0), 0);
-      const target = Number(m.monthlyContribution || 0) * 12;
-      const pct    = target ? Math.round((paid/target)*100) : 0;
-      return { m, id, paid, target, pending: Math.max(0, target-paid), pct };
+    const activeMembers = Object.entries(members)
+      .filter(([,m]) => m.status === 'active')
+      .sort((a,b) => (a[1].name||'').localeCompare(b[1].name||''));
+
+    const paidMap = {};
+    Object.values(collections).forEach(c => {
+      if (String(c.year || CUR_YEAR) !== String(year)) return;
+      if (!paidMap[c.memberId]) paidMap[c.memberId] = {};
+      paidMap[c.memberId][c.month] = (paidMap[c.memberId][c.month] || 0) + Number(c.amount || 0);
     });
 
+    const rows = activeMembers.map(([id, m]) => {
+      const yearPaid   = App.MONTHS.reduce((s, mn) => s + (paidMap[id]?.[mn] || 0), 0);
+      const yearTarget = Number(m.monthlyContribution || 0) * 12;
+      const pct        = yearTarget ? Math.round((yearPaid / yearTarget) * 100) : 0;
+      const monthsPaid = App.MONTHS.filter(mn => (paidMap[id]?.[mn] || 0) >= Number(m.monthlyContribution || 0) && Number(m.monthlyContribution || 0) > 0).length;
+      return { id, m, yearPaid, yearTarget, pending: Math.max(0, yearTarget - yearPaid), pct, monthsPaid };
+    });
+
+    const grandPaid    = rows.reduce((s, r) => s + r.yearPaid, 0);
+    const grandTarget  = rows.reduce((s, r) => s + r.yearTarget, 0);
+    const grandPending = rows.reduce((s, r) => s + r.pending, 0);
+    const grandPct     = grandTarget ? Math.round((grandPaid / grandTarget) * 100) : 0;
+
     document.getElementById('report-area').innerHTML = `
+      <div class="rep-header-card no-print">
+        <div>
+          <div class="rh-title">${settings.churchName || 'Church'}</div>
+          <div class="rh-val">Member-wise Report — ${year}</div>
+          <div class="rh-sub">${activeMembers.length} active members</div>
+        </div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+          ${summaryPill('🎯 Annual Target',  App.currency(grandTarget),  'rgba(255,255,255,.12)')}
+          ${summaryPill('✅ Total Collected', App.currency(grandPaid),   'rgba(46,204,113,.25)')}
+          ${summaryPill('⏳ Total Pending',   App.currency(grandPending),'rgba(231,76,60,.22)')}
+          ${summaryPill('📈 Overall %',       grandPct + '%',            'rgba(240,165,0,.25)')}
+        </div>
+      </div>
+
       <div class="card">
-        <div class="card-header"><h3>Member-wise Yearly Report – ${year}</h3></div>
+        <div class="card-header"><h3>Member-wise Annual Summary — ${year}</h3></div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>#</th><th>Member</th><th>Area</th><th>Monthly</th><th>Annual Target</th><th>Paid</th><th>Pending</th><th>%</th></tr></thead>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Member</th>
+                <th>Area</th>
+                <th>Monthly</th>
+                <th>Annual Target</th>
+                <th>Paid</th>
+                <th>Pending</th>
+                <th>Months Paid</th>
+                <th>Achievement</th>
+                <th class="no-print">Progress</th>
+              </tr>
+            </thead>
             <tbody>
-              ${memberRows.map((r, i) => `
+              ${rows.map((r, i) => `
                 <tr>
-                  <td>${i+1}</td>
-                  <td style="font-weight:600"><a href="member-profile.html?id=${r.id}" style="color:var(--navy)">${r.m.name}</a></td>
-                  <td>${r.m.area||'–'}</td>
-                  <td>${App.currency(r.m.monthlyContribution||0)}</td>
-                  <td>${App.currency(r.target)}</td>
-                  <td style="color:var(--green);font-weight:600">${App.currency(r.paid)}</td>
-                  <td style="color:var(--red)">${App.currency(r.pending)}</td>
-                  <td><span class="badge ${r.pct>=80?'badge-success':r.pct>=50?'badge-warning':'badge-neutral'}">${r.pct}%</span></td>
+                  <td style="color:var(--muted);font-size:.75rem">${i+1}</td>
+                  <td>
+                    <a href="member-profile.html?id=${r.id}" style="font-weight:700;color:var(--navy)">${r.m.name}</a>
+                    <div style="font-size:.68rem;color:var(--muted)">${r.id}</div>
+                  </td>
+                  <td style="font-size:.8rem">${r.m.area || '–'}</td>
+                  <td style="font-weight:600">${App.currency(r.m.monthlyContribution || 0)}</td>
+                  <td>${App.currency(r.yearTarget)}</td>
+                  <td style="color:var(--green);font-weight:700">${r.yearPaid > 0 ? App.currency(r.yearPaid) : '–'}</td>
+                  <td style="color:var(--red)">${r.pending > 0 ? App.currency(r.pending) : '–'}</td>
+                  <td>
+                    <span class="badge ${r.monthsPaid===12?'badge-success':r.monthsPaid>0?'badge-warning':'badge-neutral'}">
+                      ${r.monthsPaid} / 12
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge ${r.pct>=80?'badge-success':r.pct>=50?'badge-warning':r.pct>0?'badge-danger':'badge-neutral'}">
+                      ${r.pct}%
+                    </span>
+                  </td>
+                  <td class="no-print" style="min-width:100px">
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width:${r.pct}%;background:${r.pct>=80?'var(--green)':r.pct>=50?'var(--gold)':r.pct>0?'var(--red)':'var(--border)'}"></div>
+                    </div>
+                    <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem">${r.pct}%</div>
+                  </td>
                 </tr>
               `).join('')}
+              <tr style="background:var(--ivory);font-weight:800;font-size:.88rem;border-top:2px solid var(--border)">
+                <td></td>
+                <td>GRAND TOTAL</td>
+                <td></td>
+                <td></td>
+                <td>${App.currency(grandTarget)}</td>
+                <td style="color:var(--green)">${App.currency(grandPaid)}</td>
+                <td style="color:var(--red)">${grandPending > 0 ? App.currency(grandPending) : '–'}</td>
+                <td></td>
+                <td><span class="badge ${grandPct>=80?'badge-success':grandPct>=50?'badge-warning':'badge-danger'}">${grandPct}%</span></td>
+                <td class="no-print"></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -222,48 +727,89 @@ App.requireAuth(({ churchId, role, settings }) => {
     `;
   }
 
-  function tile(ico, lbl, val, color) {
-    return `<div class="stat-card">
-      <div class="stat-icon ${color||'navy'}">${ico}</div>
-      <div class="stat-info"><div class="label">${lbl}</div><div class="value" style="font-size:1.1rem">${val}</div></div>
+  /* ── Helper: summary pill in header card ── */
+  function summaryPill(label, value, bg) {
+    return `<div style="background:${bg};border-radius:10px;padding:.6rem 1rem;min-width:120px">
+      <div style="font-size:.68rem;opacity:.7;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</div>
+      <div style="font-size:1.05rem;font-weight:800;margin-top:.1rem">${value}</div>
     </div>`;
   }
 
-  window.exportCSV = function() {
-    const type  = document.getElementById('rep-type').value;
-    const month = document.getElementById('rep-month').value;
-    const year  = document.getElementById('rep-year').value;
+  /* ── Helper: mini stat tile ── */
+  function tile(ico, lbl, val, color) {
+    return `<div class="stat-card">
+      <div class="stat-icon ${color || 'navy'}">${ico}</div>
+      <div class="stat-info">
+        <div class="label">${lbl}</div>
+        <div class="value" style="font-size:1.05rem">${val}</div>
+      </div>
+    </div>`;
+  }
 
+  /* ── CSV Export ── */
+  window.exportCSV = function() {
+    const year  = document.getElementById('rep-year').value;
+    const month = document.getElementById('rep-month').value;
     let csv = '', filename = '';
-    if (type === 'monthly') {
-      csv = 'Name,Area,Target,Paid,Balance,Status\n';
-      filename = `report_${month}_${year}.csv`;
-      Object.entries(members).filter(([,m])=>m.status==='active').forEach(([id,m]) => {
-        const colls = Object.values(collections).filter(c=>c.memberId===id&&c.month===month&&String(c.year||yr)===year);
-        const paid  = colls.reduce((s,c)=>s+Number(c.amount||0),0);
-        const t     = Number(m.monthlyContribution||0);
-        const st    = paid>=t?'Completed':paid>0?'Partial':'Pending';
-        csv += `"${m.name}","${m.area||''}",${t},${paid},${Math.max(0,t-paid)},${st}\n`;
-      });
+
+    if (currentTab === 'yearly') {
+      // Full member × month grid
+      csv = 'Member,ID,' + App.MONTHS.join(',') + ',Total\n';
+      filename = `yearly_overview_${year}.csv`;
+      Object.entries(members).filter(([,m])=>m.status==='active')
+        .sort((a,b)=>a[1].name.localeCompare(b[1].name))
+        .forEach(([id, m]) => {
+          const monthAmts = App.MONTHS.map(mn => {
+            const paid = Object.values(collections)
+              .filter(c => c.memberId===id && c.month===mn && String(c.year||CUR_YEAR)===String(year))
+              .reduce((s,c)=>s+Number(c.amount||0),0);
+            return paid || '';
+          });
+          const total = monthAmts.reduce((s,v)=>s+(Number(v)||0),0);
+          csv += `"${m.name}",${id},${monthAmts.join(',')},${total}\n`;
+        });
+    } else if (currentTab === 'monthly') {
+      csv = '#,Name,Area,Target,Paid,Balance,Status\n';
+      filename = `monthly_${month}_${year}.csv`;
+      Object.entries(members).filter(([,m])=>m.status==='active')
+        .sort((a,b)=>a[1].name.localeCompare(b[1].name))
+        .forEach(([id,m], i) => {
+          const paid = Object.values(collections)
+            .filter(c=>c.memberId===id&&c.month===month&&String(c.year||CUR_YEAR)===String(year))
+            .reduce((s,c)=>s+Number(c.amount||0),0);
+          const t  = Number(m.monthlyContribution||0);
+          const st = paid>=t&&t>0?'Completed':paid>0?'Partial':'Pending';
+          csv += `${i+1},"${m.name}","${m.area||''}",${t},${paid},${Math.max(0,t-paid)},${st}\n`;
+        });
     } else {
-      csv = 'Month,Target,Collected,Pending,Achievement%\n';
-      filename = `report_yearly_${year}.csv`;
-      App.MONTHS.forEach(mn => {
-        const c = Object.values(collections).filter(c=>c.month===mn&&String(c.year||yr)===year).reduce((s,c)=>s+Number(c.amount||0),0);
-        const t = Object.values(members).filter(m=>m.status==='active').reduce((s,m)=>s+Number(m.monthlyContribution||0),0);
-        csv += `${mn},${t},${c},${Math.max(0,t-c)},${t?Math.round((c/t)*100):0}%\n`;
-      });
+      csv = '#,Name,Area,Monthly,Annual Target,Paid,Pending,Months Paid,%\n';
+      filename = `member_report_${year}.csv`;
+      Object.entries(members).filter(([,m])=>m.status==='active')
+        .sort((a,b)=>a[1].name.localeCompare(b[1].name))
+        .forEach(([id,m], i) => {
+          const yearColls = Object.values(collections).filter(c=>c.memberId===id&&String(c.year||CUR_YEAR)===String(year));
+          const paid = yearColls.reduce((s,c)=>s+Number(c.amount||0),0);
+          const target = Number(m.monthlyContribution||0)*12;
+          const pct = target?Math.round((paid/target)*100):0;
+          const mpaid = App.MONTHS.filter(mn=>yearColls.filter(c=>c.month===mn).reduce((s,c)=>s+Number(c.amount||0),0)>=Number(m.monthlyContribution||0)&&Number(m.monthlyContribution||0)>0).length;
+          csv += `${i+1},"${m.name}","${m.area||''}",${m.monthlyContribution||0},${target},${paid},${Math.max(0,target-paid)},${mpaid},${pct}%\n`;
+        });
     }
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv, { type: 'text/csv;charset=utf-8' }]);
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   loadData();
 });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
