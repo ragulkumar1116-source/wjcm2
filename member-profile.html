@@ -25,33 +25,42 @@ App.requireAuth(({ churchId, role }) => {
 
   const cid = churchId;
   const body = document.getElementById('page-body');
+  
+  let currentMember = null;
+  let cachedCollections = {};
+  let deleteCollectionTarget = null;
 
   async function load() {
     const members     = (await SyncEngine.read(`churches/${cid}/members`, `members_${cid}`)) || {};
     const collections = (await SyncEngine.read(`churches/${cid}/collections`, `collections_${cid}`)) || {};
+    cachedCollections = collections;
 
     const m = members[memberId];
+    currentMember = m;
     if (!m) { body.innerHTML = '<p>Member not found.</p>'; return; }
 
-    // Compute stats
     const monthly = Number(m.monthlyContribution || 0);
     const yr = App.currentYear();
 
-    const memberColls = Object.values(collections).filter(c => c.memberId === memberId);
-    const totalPaid   = memberColls.reduce((s, c) => s + Number(c.amount || 0), 0);
+    // Map through collections matching this member
+    const memberColls = Object.entries(collections)
+      .map(([id, data]) => ({ id, ...data }))
+      .filter(c => c.memberId === memberId);
 
-    // yearly summary
-    const yearColls = memberColls.filter(c => String(c.year || yr) === String(yr));
+    const totalPaid = memberColls.reduce((s, c) => s + Number(c.amount || 0), 0);
+
+    // Yearly summary
+    const yearColls = memberColls.filter(c => String(c.year || c.datePaid?.split('-')[0] || yr) === String(yr));
     const yearPaid  = yearColls.reduce((s, c) => s + Number(c.amount || 0), 0);
     const yearTarget= monthly * 12;
 
-    // monthly history for current year
+    // Monthly breakdown history
     const monthData = App.MONTHS.map(mn => {
       const paid = yearColls.filter(c => c.month === mn).reduce((s, c) => s + Number(c.amount || 0), 0);
       return { month: mn, paid, target: monthly, status: paid >= monthly ? 'paid' : paid > 0 ? 'partial' : 'unpaid' };
     });
 
-    // Current month
+    // Current real-time month status
     const curMonth = App.currentMonthName();
     const curPaid  = yearColls.filter(c => c.month === curMonth).reduce((s, c) => s + Number(c.amount || 0), 0);
     const curBal   = Math.max(0, monthly - curPaid);
@@ -59,14 +68,16 @@ App.requireAuth(({ churchId, role }) => {
     const init = (m.name || 'M').slice(0,2).toUpperCase();
     const pct  = yearTarget ? Math.round((yearPaid / yearTarget) * 100) : 0;
 
+    const canEdit = role === 'admin' || role === 'collector';
+
     body.innerHTML = `
-      <div style="display:flex;gap:.7rem;margin-bottom:1.2rem;align-items:center">
+      <div style="display:flex;gap:.7rem;margin-bottom:1.2rem;align-items:center" class="no-print">
         <a href="members.html" class="btn btn-outline btn-sm">← Back</a>
-        ${role === 'admin' || role === 'collector' ? `<button class="btn btn-gold btn-sm" onclick="addCollection()">➕ Add Collection</button>` : ''}
+        ${canEdit ? `<button class="btn btn-gold btn-sm" onclick="addCollection()">➕ Add Collection</button>` : ''}
         <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Print</button>
       </div>
 
-      <!-- Profile header -->
+      <!-- Profile Header Banner -->
       <div class="card" style="margin-bottom:1rem">
         <div class="card-body" style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
           <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--blue));
@@ -89,7 +100,7 @@ App.requireAuth(({ churchId, role }) => {
         </div>
       </div>
 
-      <!-- Stat cards -->
+      <!-- Informational KPIs -->
       <div class="stat-grid" style="margin-bottom:1rem">
         <div class="stat-card">
           <div class="stat-icon green">✅</div>
@@ -127,8 +138,10 @@ App.requireAuth(({ churchId, role }) => {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-        <!-- Monthly history table -->
+      <!-- Data Layout Split Tables -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem" class="form-row">
+        
+        <!-- Target Ledger Run -->
         <div class="card">
           <div class="card-header"><h3>Monthly History ${yr}</h3></div>
           <div class="table-wrap">
@@ -139,7 +152,7 @@ App.requireAuth(({ churchId, role }) => {
               <tbody>
                 ${monthData.map(r => `
                   <tr>
-                    <td>${r.month.slice(0,3)}</td>
+                    <td><strong>${r.month.slice(0,3)}</strong></td>
                     <td style="font-weight:600">${App.currency(r.paid)}</td>
                     <td>${App.currency(r.target)}</td>
                     <td>
@@ -154,21 +167,31 @@ App.requireAuth(({ churchId, role }) => {
           </div>
         </div>
 
-        <!-- Recent collections -->
+        <!-- Ledger Modification Output -->
         <div class="card">
           <div class="card-header"><h3>Collection Records</h3></div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>Month</th><th>Amount</th><th>Date</th><th>Remarks</th></tr></thead>
+              <thead>
+                <tr><th>Month</th><th>Amount</th><th>Date</th><th>Remarks</th>${canEdit ? `<th class="no-print">Actions</th>` : ''}</tr>
+              </thead>
               <tbody>
                 ${memberColls.length === 0
-                  ? `<tr><td colspan="4"><div class="empty-state"><div class="ico">💰</div><p>No collections yet</p></div></td></tr>`
-                  : memberColls.sort((a,b) => b.date?.localeCompare(a.date)).map(c => `
+                  ? `<tr><td colspan="${canEdit ? '5' : '4'}"><div class="empty-state"><div class="ico">💰</div><p>No collections yet</p></div></td></tr>`
+                  : memberColls.sort((a,b) => (b.datePaid || b.date || '').localeCompare(a.datePaid || a.date || '')).map(c => `
                     <tr>
-                      <td>${c.month}</td>
+                      <td><span class="badge badge-neutral">${c.month} ${c.year || yr}</span></td>
                       <td style="font-weight:600;color:var(--green)">${App.currency(c.amount)}</td>
-                      <td style="font-size:.8rem">${c.date || '–'}</td>
-                      <td style="font-size:.8rem;color:var(--muted)">${c.remarks || ''}</td>
+                      <td style="font-size:.8rem">${c.datePaid || c.date || '–'}</td>
+                      <td style="font-size:.8rem;color:var(--muted)">${c.remarks || '–'}</td>
+                      ${canEdit ? `
+                        <td class="no-print">
+                          <div style="display:flex;gap:.3rem">
+                            <button class="btn btn-outline btn-sm" style="padding:.25rem .5rem;" onclick="editCollection('${c.id}')">✏️</button>
+                            ${role === 'admin' ? `<button class="btn btn-danger btn-sm" style="padding:.25rem .5rem;" onclick="deleteCollection('${c.id}')">🗑</button>` : ''}
+                          </div>
+                        </td>
+                      ` : ''}
                     </tr>
                   `).join('')}
               </tbody>
@@ -177,12 +200,17 @@ App.requireAuth(({ churchId, role }) => {
         </div>
       </div>
 
-      <!-- Add collection modal -->
+      <!-- Upsert Entry Dialog Overlay -->
       <div class="modal-overlay" id="coll-modal">
         <div class="modal">
-          <div class="modal-header"><h3>Add Collection for ${m.name}</h3><button class="btn btn-outline btn-sm" onclick="document.getElementById('coll-modal').classList.remove('open')">✕</button></div>
+          <div class="modal-header">
+            <h3 id="modal-title">Add Collection for ${m.name}</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal()">✕</button>
+          </div>
           <div class="modal-body">
             <div id="coll-alert" class="alert alert-danger"></div>
+            <input type="hidden" id="edit-collection-id">
+            
             <div class="form-row">
               <div class="form-group">
                 <label>Month *</label>
@@ -198,7 +226,7 @@ App.requireAuth(({ churchId, role }) => {
             <div class="form-row">
               <div class="form-group">
                 <label>Amount Paid (${App.getCurrency()}) *</label>
-                <input id="c-amount" type="number" class="form-control" placeholder="${monthly}" value="${monthly}">
+                <input id="c-amount" type="number" class="form-control" placeholder="${monthly}">
               </div>
               <div class="form-group">
                 <label>Date</label>
@@ -211,8 +239,22 @@ App.requireAuth(({ churchId, role }) => {
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-outline" onclick="document.getElementById('coll-modal').classList.remove('open')">Cancel</button>
-            <button class="btn btn-gold" onclick="saveCollection('${memberId}','${m.name}')">💾 Save</button>
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-gold" onclick="saveCollection()">💾 Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete Entry Confirmation Dialog -->
+      <div class="modal-overlay" id="del-col-modal">
+        <div class="modal" style="max-width:380px">
+          <div class="modal-header"><h3>Delete Collection Record</h3></div>
+          <div class="modal-body">
+            <p>Are you sure you want to remove this collection transaction record? This cannot be reversed.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="document.getElementById('del-col-modal').classList.remove('open')">Cancel</button>
+            <button class="btn btn-danger" onclick="confirmCollectionDelete()">🗑 Delete</button>
           </div>
         </div>
       </div>
@@ -220,10 +262,36 @@ App.requireAuth(({ churchId, role }) => {
   }
 
   window.addCollection = function() {
+    document.getElementById('coll-alert').classList.remove('show');
+    document.getElementById('edit-collection-id').value = '';
+    document.getElementById('c-month').value = App.currentMonthName();
+    document.getElementById('c-year').value = App.currentYear();
+    document.getElementById('c-amount').value = currentMember?.monthlyContribution || '';
+    document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('c-remarks').value = '';
+    document.getElementById('modal-title').textContent = `Add Collection for ${currentMember?.name}`;
     document.getElementById('coll-modal').classList.add('open');
   };
 
-  window.saveCollection = async function(memberId, memberName) {
+  window.editCollection = function(id) {
+    const c = cachedCollections[id];
+    if (!c) return;
+    document.getElementById('coll-alert').classList.remove('show');
+    document.getElementById('edit-collection-id').value = id;
+    document.getElementById('c-month').value = c.month;
+    document.getElementById('c-year').value = c.year || App.currentYear();
+    document.getElementById('c-amount').value = c.amount;
+    document.getElementById('c-date').value = c.datePaid || c.date || '';
+    document.getElementById('c-remarks').value = c.remarks || '';
+    document.getElementById('modal-title').textContent = 'Edit Collection Entry';
+    document.getElementById('coll-modal').classList.add('open');
+  };
+
+  window.closeModal = function() {
+    document.getElementById('coll-modal').classList.remove('open');
+  };
+
+  window.saveCollection = async function() {
     const month   = document.getElementById('c-month').value;
     const year    = document.getElementById('c-year').value;
     const amount  = document.getElementById('c-amount').value;
@@ -237,14 +305,59 @@ App.requireAuth(({ churchId, role }) => {
       return;
     }
 
-    const id = App.newId('COL');
-    const data = { memberId, memberName, month, year: Number(year), amount: Number(amount), date, remarks, createdAt: Date.now() };
-    await SyncEngine.write(`churches/${cid}/collections/${id}`, data, 'set');
+    const editId = document.getElementById('edit-collection-id').value;
+    const id     = editId || App.newId('COL');
+    
+    // Maintain alignment with global collection records node attributes
+    const data = { 
+      memberId, 
+      memberName: currentMember?.name || '', 
+      month, 
+      year: Number(year), 
+      amount: Number(amount), 
+      datePaid: date, 
+      date: date, 
+      remarks, 
+      updatedAt: Date.now() 
+    };
+
+    if (!editId) {
+      data.createdAt = Date.now();
+    } else {
+      data.createdAt = cachedCollections[editId].createdAt || Date.now();
+    }
+
+    await SyncEngine.write(`churches/${cid}/collections/${id}`, data, editId ? 'update' : 'set');
+    
+    // Dynamically update runtime memory layout if offline context takes precedence
+    cachedCollections[id] = data;
+    SyncEngine.cacheWrite('collections_' + cid, cachedCollections);
+
     document.getElementById('coll-modal').classList.remove('open');
-    load(); // refresh
+    load();
   };
 
-  load();
+  window.deleteCollection = function(id) {
+    deleteCollectionTarget = id;
+    document.getElementById('del-col-modal').classList.add('open');
+  };
+
+  window.confirmCollectionDelete = async function() {
+    if (!deleteCollectionTarget) return;
+
+    await SyncEngine.write(`churches/${cid}/collections/${deleteCollectionTarget}`, null, 'remove');
+    
+    delete cachedCollections[deleteCollectionTarget];
+    SyncEngine.cacheWrite('collections_' + cid, cachedCollections);
+
+    document.getElementById('del-col-modal').classList.remove('open');
+    deleteCollectionTarget = null;
+    load();
+  };
+
+  db.ref(`churches/${cid}/collections`).on('value', () => {
+    load();
+  });
 });
 </script>
 </body>
